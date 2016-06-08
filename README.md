@@ -2,6 +2,9 @@
 
 This prototype visualizes how orbit-db's data flow works.
 
+## Demo
+Live demo: http://celebdil.benet.ai:8080/ipfs/Qmezm7g8mBpWyuPk6D84CNcfLKJwU6mpXuEN5GJZNkX3XK/
+
 ## Run
 Open `dist/index.html` in your browser.
 
