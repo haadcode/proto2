@@ -102,22 +102,12 @@ const ipfsDaemon = (IPFS, repo, signalServerAddress) => {
 let ipfs, orbit;
 const peers = ['/tmp/proto2-1', '/tmp/proto2-2'];
 Promise.map(peers, (peer, index) => {
-  return ipfsDaemon(IpfsApi, peer).then((ipfs) => OrbitDB.connect(null, username + ((index+1) % 2 !== 0 ? 'A' : 'B'), '', ipfs))
-}, { concurrency: 1 }).then((res) => {
-  Promise.map(res, (orbit, index) => {
-    return orbit.kvstore(channel, { maxHistory: 5 })
-      .then((db) => {
-        window.onOrbitDBReady(res[index], db);
-        let count = 1;
-        const query = () => {
-          const startTime = new Date().getTime();
-          db.put(key, value + " " + count).then((res) => {
-            const endTime = new Date().getTime();
-            logger.debug(`db.put (#${count}) took ${(endTime - startTime)} ms\n`);
-            count ++;
-          }).catch((e) => logger.error(e));
-        };
-        return db;
-      });
-  }, { concurrency : 1 });
-});
+  return ipfsDaemon(IpfsApi, peer)
+    .then((ipfs) => OrbitDB.connect(null, username + ((index+1) % 2 !== 0 ? 'A' : 'B'), '', ipfs))
+}, { concurrency: 1 })
+  .then((res) => {
+    Promise.map(res, (orbit, index) => {
+      return orbit.kvstore(channel, { maxHistory: 5 })
+        .then((db) => window.onOrbitDBReady(res[index], db))
+    }, { concurrency : 1 });
+  });
