@@ -1,0 +1,531 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script type="text/javascript" src="bundle.js" charset="utf-8"></script>
+    <link href='https://fonts.googleapis.com/css?family=Source+Code+Pro|Indie+Flower' rel='stylesheet' type='text/css'>
+  </head>
+  <body style="font-family: 'Indie Flower'; margin: 0; height: 100%; width: 100%; overflow: auto;">
+    <div style="font-size: 0.8em; background-color: rgb(250, 250, 250); padding: 0.5em; border-bottom: 1px solid rgb(240, 240, 240);">
+      Foreground: <button id="add1" type="button">Random Color</button>
+      Key-Value: <input id="key" type="text" placeholder="key"/><input id="value" type="text" placeholder="value"/>
+      <button id="add3" type="button">Set</button>
+      <br>
+
+      Background: <button id="add2" type="button">Random Color</button>
+      Speed: <input id="speed" type="text" placeholder="speed" value="200"/>
+      <button id="setSpeed" type="button">Set</button>
+      <br>
+    </div>
+
+    <svg id="fsmcanvas" width="100%" height="100%" viewBox="0 0 1280 720" style="overflow: auto; position: absolute; width: 100%; height: 100%;">
+      <text x=50% y=2% font-size="2.0em" text-anchor="middle">OrbitDB</text>
+      <text x=2.5% y=22.5% font-size="2.0em">KeyValueStore</text>
+      <text x=52.5% y=22.5% font-size="2.0em">KeyValueStore</text>
+      <text x=2.5% y=58% font-size="2.0em">Store</text>
+      <text x=52.5% y=58% font-size="2.0em">Store</text>
+
+      <text id="PUT" x=5% y=28% font-size="1.75em" opacity=0.1>.put(&nbsp;&nbsp;)</text>
+      <rect id="PUTRECT" x=9.5% y=25.9% width=16 height=16 opacity=0 fil="#000000"></rect>
+
+      <path id="PUTPATH" d="M 129, 200 C 143, 274, 14, 228, 65, 392" stroke="rgba(0, 0, 0, 0.5)" fill="none" opacity="0"/>
+      <path id="ADDPATH" d="M 166, 478 C 180, 523, 54, 479, 56, 519" stroke="rgba(0, 0, 0, 0.5)" fill="none" opacity="0"/>
+      <path id="INDEXPATH" d="M 520, 350 C 625, 366, 625, 498, 556, 552" stroke="rgba(0, 0, 0, 0.5)" fill="none" opacity="0"/>
+      <path id="PUBSUBPATH" d="M 428, 106 C 270, 82, 316, 161, 226, 152" stroke="rgba(0, 0, 0, 0.5)" fill="none" opacity="0"/>
+      <path id="PUBSUBPATH2" d="M 602, 121 C 564, 207, 619, 188, 673, 193" stroke="rgba(0, 0, 0, 0.5)" fill="none" opacity="0"/>
+      <path id="SYNCPATH" d="M 815, 422 C 836, 300, 774, 319, 799, 218" stroke="rgba(0, 0, 0, 0.5)" fill="none" opacity="0"/>
+      <path id="MERGEPATH" d="M 706, 521 C 709, 435, 904, 540, 885, 466" stroke="rgba(0, 0, 0, 0.5)" fill="none" opacity="0"/>
+      <path id="INDEXPATH2" d="M 1098, 550 C 1123, 482, 1106, 430, 1095, 379" stroke="rgba(0, 0, 0, 0.5)" fill="none" opacity="0"/>
+
+      <text id="ADD" x=5% y=63% font-size="1.75em" opacity=0.1>.addOperation()</text>
+      <text id="ADDOP" x=5% y=65% font-size="0.6em" font-family="Source Code Pro" opacity=0>{ "op": "PUT", "key": "foreground", "value": "#6428b6", "meta": { "ts": 1465293000893 }}</text>
+
+      <text id="SYNC" x=55% y=28% font-size="1.75em" opacity=0.1>.sync(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</text>
+      <text id="SYNCTEXT" x=60.8% y=27.3% width=16 height=16 opacity=0 fill="#000" font-family="Source Code Pro" font-size="0.6em">QmQoJtbDW2QySdzqUBnmsjK5hm6bjUWHMU14ADGdrz82uM</text>
+
+      <text id="MERGE" x=55% y=63% font-size="1.75em" opacity=0.1>.merge(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</text>
+      <text id="MERGETEXT" x=62.1% y=62.4% font-size="0.6em" font-family="Source Code Pro" opacity=0>QmQoJtbDW2QySdzqUBnmsjK5hm6bjUWHMU14ADGdrz82uM</text>
+    </svg>
+
+    <script type="text/javascript">
+
+<!-- START -->
+  let peers = [];
+  let dbs = [];
+
+  let bgColors = ["#000000", "#000000"]
+  let fgColor  = "#000000";
+  let prevbgColors = ["#000000", "#000000"]
+  let prevfgColor  = "#000000";
+
+  let STEP_INTERVAL = 500;
+  const WIDTH  = 1280;
+  const HEIGHT = 720;
+  const HEADER_HEIGHT = 32;
+
+  window.onOrbitDBReady = (orbit, db) => {
+    let data = [];
+    let peerIndex = db.id === 'PeerA' ? 0 : 1;
+
+    dbs.push(db);
+    peers.push(db.id);
+    updatePeers(peers);
+
+    if(peerIndex === 0) {
+      // set foreground button
+      d3.select("#add1").on("click", (e) => {
+        const color = '#'+Math.floor(Math.random()*16777215).toString(16);
+        d3.select("#PUT").attr("opacity", 0.8);
+        d3.select("#PUTRECT").attr("opacity", 1).attr("fill", color);
+
+        setTimeout(() => {
+          d3.select("#PUTPATH").attr("opacity", 0.8).attr("stroke", color);
+        }, STEP_INTERVAL/4);
+
+        db.put("foreground", color).then((hash) => {
+          const text = JSON.stringify(db._oplog.items[db._oplog.items.length - 1].payload, null, 2);
+          setTimeout(() => {
+            d3.select("#ADD").attr("opacity", 0.8);
+            d3.select("#ADDOP").attr("opacity", 0.8);
+            d3.select("#ADDOP").text(text);
+
+            setTimeout(() => {
+              d3.select("#ADDPATH").attr("opacity", 0.8);
+            }, STEP_INTERVAL/2);
+
+            setTimeout(() => {
+              d3.select("#ADD").attr("opacity", 0.1);
+              d3.select("#ADDOP").attr("opacity", 0);
+            }, STEP_INTERVAL);
+          }, STEP_INTERVAL/2);
+        })
+
+        setTimeout(() => {
+          d3.select("#PUT").attr("opacity", 0.1);
+          d3.select("#PUTRECT").attr("opacity", 0);
+          // setTimeout(() => {
+            d3.select("#PUTPATH").attr("opacity", 0.1).attr("stroke", "rgba(0, 0, 0, 0.5)");
+          // }, STEP_INTERVAL);
+          setTimeout(() => {
+            d3.select("#ADDPATH").attr("opacity", 0.1);
+          }, STEP_INTERVAL);
+        }, STEP_INTERVAL + STEP_INTERVAL/2);
+      });
+
+      // set background button
+      d3.select("#add2").on("click", (e) => {
+        const color = '#'+Math.floor(Math.random()*16777215).toString(16);
+        d3.select("#PUT").attr("opacity", 0.8);
+        d3.select("#PUTRECT").attr("opacity", 1).attr("fill", color);
+
+        setTimeout(() => {
+          d3.select("#PUTPATH").attr("opacity", 0.8).attr("stroke", color);
+        }, STEP_INTERVAL/4);
+
+        db.put("background", color).then((hash) => {
+          const text = JSON.stringify(db._oplog.items[db._oplog.items.length - 1].payload, null, 2);
+          setTimeout(() => {
+            d3.select("#ADD").attr("opacity", 1);
+            d3.select("#ADDOP").attr("opacity", 1);
+            d3.select("#ADDOP").text(text);
+
+            setTimeout(() => {
+              d3.select("#ADDPATH").attr("opacity", 0.8);
+            }, STEP_INTERVAL/2);
+
+            setTimeout(() => {
+              d3.select("#ADD").attr("opacity", 0.1);
+              d3.select("#ADDOP").attr("opacity", 0);
+            }, STEP_INTERVAL);
+          }, STEP_INTERVAL/2);
+        })
+
+        setTimeout(() => {
+          d3.select("#PUT").attr("opacity", 0.1);
+          d3.select("#PUTRECT").attr("opacity", 0);
+          setTimeout(() => {
+            d3.select("#PUTPATH").attr("opacity", 0.1).attr("stroke", "rgba(0, 0, 0, 0.5)");
+          }, STEP_INTERVAL);
+          setTimeout(() => {
+            d3.select("#ADDPATH").attr("opacity", 0.1);
+          }, STEP_INTERVAL/2);
+        }, STEP_INTERVAL + STEP_INTERVAL/2);
+      });
+
+      // set key value button
+      d3.select("#add3").on("click", (e) => {
+        const key = d3.select("#key").property("value");
+        const value = d3.select("#value").property("value");
+        db.put(key, value);
+      });
+
+      // set speed button
+      d3.select("#setSpeed").on("click", (e) => {
+        const speed = d3.select("#speed").property("value");
+        STEP_INTERVAL = speed;
+        // dbs.forEach((db) => window.onOrbitDBReady(orbit, db));
+      });
+    }
+
+    orbit.events.on('ready', () => {
+      prevfgColor = fgColor;
+      fgColor = db.get("foreground");
+    });
+
+    orbit.events.on('message', (channel, hash) => {
+      if(peerIndex === 0)
+        return;
+
+      setTimeout(() => {
+        updatePubSubVisuals(channel, hash);
+      }, STEP_INTERVAL * 3);
+
+      if(peerIndex === 1) {
+        setTimeout(() => {
+          d3.select("#PUBSUBPATH2").attr("opacity", 0.8);
+          setTimeout(() => {
+            d3.select("#PUBSUBPATH2").attr("opacity", 0.1);
+          }, STEP_INTERVAL);
+        }, STEP_INTERVAL * 3 + STEP_INTERVAL/2);
+        setTimeout(() => {
+          d3.select("#SYNC").attr("opacity", 1);
+          d3.select("#SYNCTEXT").attr("opacity", 1).text(hash);
+          setTimeout(() => {
+            d3.select("#SYNC").attr("opacity", 0.1);
+            d3.select("#SYNCTEXT").attr("opacity", 0);
+          }, STEP_INTERVAL + STEP_INTERVAL/2);
+        }, STEP_INTERVAL * 4);
+        setTimeout(() => {
+          d3.select("#SYNCPATH").attr("opacity", 0.8);
+          setTimeout(() => {
+            d3.select("#SYNCPATH").attr("opacity", 0.1);
+          }, STEP_INTERVAL);
+        }, STEP_INTERVAL * 4 + STEP_INTERVAL/2);
+        setTimeout(() => {
+          d3.select("#MERGE").attr("opacity", 1);
+          d3.select("#MERGETEXT").attr("opacity", 1).text(hash);
+          setTimeout(() => {
+            d3.select("#MERGE").attr("opacity", 0.1);
+            d3.select("#MERGETEXT").attr("opacity", 0);
+          }, STEP_INTERVAL + STEP_INTERVAL/2);
+        }, STEP_INTERVAL * 5);
+        setTimeout(() => {
+          d3.select("#MERGEPATH").attr("opacity", 0.8);
+          setTimeout(() => {
+            d3.select("#MERGEPATH").attr("opacity", 0.1);
+          }, STEP_INTERVAL);
+        }, STEP_INTERVAL * 5 + STEP_INTERVAL/2);
+      }
+    });
+
+    orbit.events.on('synced', (channel, items) => {
+      if(peerIndex === 0) {
+        setTimeout(() => {
+          updateOplogVisuals(peerIndex, db._oplog.items.slice(-5).reverse());
+          setTimeout(() => {
+            d3.select("#INDEXPATH").attr("opacity", 0.8);
+            setTimeout(() => {
+              d3.select("#INDEXPATH").attr("opacity", 0.1);
+            }, STEP_INTERVAL + STEP_INTERVAL/2);
+          }, STEP_INTERVAL/2);
+        }, STEP_INTERVAL);
+
+        setTimeout(() => {
+          updateIndexVisuals(peerIndex, db._index._index);
+          prevbgColors[peerIndex] = bgColors[peerIndex];
+          bgColors[peerIndex] = db.get("background");
+          prevfgColor = fgColor;
+          fgColor = db.get("foreground");
+          updatePeers(peers);
+
+          setTimeout(() => {
+            d3.select("#PUBSUBPATH").attr("opacity", 0.8);
+            setTimeout(() => {
+              d3.select("#PUBSUBPATH").attr("opacity", 0.1);
+            }, STEP_INTERVAL);
+          }, STEP_INTERVAL/2);
+        }, STEP_INTERVAL * 2);
+      } else {
+        setTimeout(() => {
+          updateOplogVisuals(peerIndex, db._oplog.items.slice(-5).reverse());
+          setTimeout(() => {
+            d3.select("#INDEXPATH2").attr("opacity", 0.8);
+            setTimeout(() => {
+              d3.select("#INDEXPATH2").attr("opacity", 0.1);
+            }, STEP_INTERVAL);
+          }, STEP_INTERVAL/2);
+        }, STEP_INTERVAL * 5 + STEP_INTERVAL/2);
+        setTimeout(() => {
+          updateIndexVisuals(peerIndex, db._index._index);
+          prevbgColors[peerIndex] = bgColors[peerIndex];
+          bgColors[peerIndex] = db.get("background");
+          prevfgColor = fgColor;
+          fgColor = db.get("foreground");
+          updatePeers(peers);
+        }, STEP_INTERVAL * 6 + STEP_INTERVAL/2);
+      }
+    });
+
+    // orbit.events.on('data', (channel, items) => {
+    //   console.log("DATA synced", channel, items);
+    //   setTimeout(() => {
+    //     updateOplogVisuals(peerIndex, db._oplog.items.slice(-5).reverse());
+    //   }, STEP_INTERVAL * 3);
+    // });
+  };
+
+  var svg_container = d3.select("#fsmcanvas");
+  svg_container.style.display = "block";
+
+  svg_container.select(".peers").remove();
+  var peersElm = svg_container.append("g").attr("class", "peers");
+
+  svg_container.select(".oplog0").remove();
+  svg_container.select(".oplog1").remove();
+  var oplog = [svg_container.append("g").attr("class", "oplog0"), svg_container.append("g").attr("class", "oplog1")];
+
+  const updatePeers = (data)  => {
+    const peerWidth = WIDTH / 8;
+    const margin = HEADER_HEIGHT * 4;
+
+    var peerBackground = peersElm.selectAll(".peer-rect").data(data)
+
+    peerBackground.enter()
+      .append("rect")
+        .attr("class", "peer-rect")
+        .attr("width", peerWidth)
+        .attr("height", HEADER_HEIGHT * 2)
+        .attr("x", (d, i) => i === 0 ? margin : WIDTH - peerWidth - margin)
+        .attr("y", 0)
+        .attr("fill", (d, i) => prevbgColors[i])
+
+    peerBackground.transition()
+      .duration(1000)
+      .attr("fill", (d, i) => bgColors[i])
+
+    var peerText = peersElm.selectAll(".peer")
+      .data(data)
+      .enter()
+      .append("text")
+        .attr("class", "peer")
+        .attr("font-size", "2.5em")
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "text-after-edge")
+        .attr("alignment-baseline", "middle")
+        .attr("fill", "white")
+        .attr("x", (d, i) => i === 0 ? margin + peerWidth / 2 : WIDTH - peerWidth - margin + peerWidth / 2)
+        .attr("y", HEADER_HEIGHT + 4)
+        .text((d) => d)
+  };
+
+  const updateIndexVisuals = (peerIndex, items)  => {
+    const width   = WIDTH / 2;
+    const height  = HEIGHT / 4;
+    const size    = 16;
+    const margin  = HEADER_HEIGHT;
+    const padding = 2;
+    const startX  = peerIndex === 0 ? margin + 160 : WIDTH / 2 + margin + 160;
+    const startY  = height + HEADER_HEIGHT*2 + HEADER_HEIGHT/2;
+
+    const data = Object.keys(items).map((e) => { return { key: e, value: items[e] } });
+
+    svg_container.select(".indexHeader" + peerIndex).remove();
+    svg_container.append("text").attr("class", "indexHeader" + peerIndex)
+      .attr("font-size", "2.0em")
+      .attr("x", startX)
+      .attr("y", startY)
+      .text("Index")
+
+    svg_container.select(".headers1" + peerIndex).remove();
+    svg_container.append("text").attr("class", "headers1" + peerIndex)
+      .attr("font-size", "1.2em")
+      .attr("x", startX + margin)
+      .attr("y", startY + HEADER_HEIGHT)
+      .text("Key")
+
+    svg_container.select(".headers2" + peerIndex).remove();
+    svg_container.append("text").attr("class", "headers2" + peerIndex)
+      .attr("font-size", "1.2em")
+      .attr("x", startX + margin + 180)
+      .attr("y", startY + HEADER_HEIGHT)
+      .text("Value")
+
+    svg_container.select(".entry" + peerIndex).remove();
+    var index = svg_container.append("g").attr("class", "entry" + peerIndex);
+
+    var keys = index.selectAll(".keys" + peerIndex)
+      .data(data)
+      .enter()
+      .append("text")
+        .attr("class", "keys" + peerIndex)
+        .attr("width", width)
+        .attr("height", 8)
+        .attr("font-family", "Source Code Pro")
+        .attr("font-size", "1.5em")
+        .attr("fill", (d) => d.value)
+        .attr("x", startX + margin)
+        .attr("y", (d, i) => startY + HEADER_HEIGHT * 2 + i * (32))
+        .text((d) => d.key)
+
+    var values = index.selectAll(".values" + peerIndex)
+      .data(data)
+      .enter()
+      .append("text")
+        .attr("class", "values" + peerIndex)
+        .attr("width", width)
+        .attr("height", 8)
+        .attr("font-family", "Source Code Pro")
+        .attr("font-size", "1.5em")
+        .attr("fill", (d) => d.value)
+        .attr("x", startX + margin + 180)
+        .attr("y", (d, i) => startY + HEADER_HEIGHT * 2 + i * (32))
+        .text((d) => d.value)
+  };
+
+  const updateOplogVisuals = (peerIndex, data)  => {
+    const width   = WIDTH / 2;
+    const height  = HEIGHT / 4;
+    const size    = 16;
+    const margin  = HEADER_HEIGHT;
+    const padding = 2;
+    const startX  = peerIndex === 0 ? margin : WIDTH / 2 + margin;
+    const startY  = HEIGHT - height;
+
+    svg_container.select(".oplogHeader" + peerIndex).remove();
+
+    svg_container.append("text").attr("class", "oplogHeader" + peerIndex)
+      .attr("width", width)
+      .attr("height", HEADER_HEIGHT)
+      .attr("font-size", "2.0em")
+      .attr("x", startX)
+      .attr("y", startY)
+      .text("Oplog")
+
+    var ops = oplog[peerIndex].selectAll(".op" + peerIndex)
+      .data(data, (d) => d.hash)
+
+    ops.enter()
+      .append("rect")
+      .attr("class", "op" + peerIndex)
+      .attr("width", size)
+      .attr("height", size)
+      .attr("opacity", 0)
+      .attr("fill", (d) => d.payload.value)
+      .attr("transform", `translate(${startX}, ${startY})`)
+
+    ops.transition()
+      .duration(300)
+      .attr("opacity", 1)
+      .attr("fill", (d) => d.payload.value)
+      .attr("transform", (d, i) => {
+        const y = startY + HEADER_HEIGHT/2 + i * (size + padding);
+        return `translate(${startX}, ${y})`;
+      })
+
+    ops.exit()
+      .transition()
+      .duration(300)
+      .attr("opacity", 0)
+      .attr("transform", (d) => {
+        const y =  startY + HEADER_HEIGHT/2 + data.length * (size + padding) + size/2;
+        return `translate(${startX}, ${y})`;
+      })
+      .remove()
+
+    var opTexts = oplog[peerIndex].selectAll(".op-text" + peerIndex)
+      .data(data, (d) => d.hash)
+
+    opTexts.enter()
+      .append("text")
+        .attr("class", "op-text" + peerIndex)
+        .attr("width", 128)
+        .attr("height", size)
+        .attr("font-family", "Source Code Pro")
+        .attr("font-size", "0.6em")
+        .attr("text-anchor", "start")
+        .attr("opacity", 1)
+        .attr("fill", "rgba(0, 0, 0, 0)")
+        .attr("transform", (d) => {
+          const x = startX + size + padding * 4;
+          const y = startY + size;
+          return `translate(${x}, ${y})`;
+        })
+        .text((d) => JSON.stringify(d.payload, null, 2))
+
+    opTexts.transition()
+      .duration(500)
+      .attr("fill", "rgba(0, 0, 0, 1)")
+      .attr("transform", (d, i) => {
+        const x = startX + size + padding * 4;
+        const y = startY + HEADER_HEIGHT + i * (size + padding) - size / 4;
+        return `translate(${x}, ${y})`;
+      })
+
+    opTexts.exit()
+      .transition()
+      .duration(300)
+      .attr("opacity", 0)
+      .attr("transform", (d, i) => {
+        const x = startX + size + padding * 4;
+        const y = startY + HEADER_HEIGHT + data.length * (size + padding) + size / 4;
+        return `translate(${x}, ${y})`;
+      })
+      .remove()
+  };
+
+  const updatePubSubVisuals = (channel, hash) => {
+    const data = [{ channel: channel, hash: hash }];
+
+    svg_container.select(".pubsub").remove();
+    svg_container.select(".pubsubHeader").remove();
+
+    var pubsubElm = svg_container.append("g").attr("class", "pubsub")
+
+    var channelName = pubsubElm.selectAll(".pubsubChannel")
+      .data(data)
+      .enter()
+      .append("text")
+        .attr("dominant-baseline", "text-before-edge")
+        .attr("style", "margin: 0 auto;")
+        .attr("class", "pubsubChannel")
+        .attr("fill", prevfgColor)
+        .attr("font-size", "3.0em")
+        .attr("text-anchor", "middle")
+        .attr("x",  WIDTH / 2)
+        .attr("y", HEADER_HEIGHT/2)
+        .text((d) => "#" + d.channel)
+        .transition()
+          .duration(1000)
+          .attr("fill", fgColor)
+
+    var pubsubHeader = pubsubElm.append("text")
+      .attr("class", "pubsubHeader")
+      .attr("fill", "rgba(64, 64, 64, 0.8)")
+      .attr("font-size", "1.5em")
+      .attr("text-anchor", "middle")
+      .attr("x",  WIDTH / 2)
+      .attr("y", HEADER_HEIGHT * 3)
+      .text("PUBSUB")
+
+    var channelHash = pubsubElm.selectAll(".pubsubHash")
+      .data(data)
+      .enter()
+      .append("text")
+        .attr("class", "pubsubHash")
+        .attr("font-family", "Source Code Pro")
+        .attr("font-size", "0.8em")
+        .attr("text-anchor", "middle")
+        .attr("fill", "rgba(0, 0, 0, 0)")
+        .attr("x",  WIDTH / 2)
+        .attr("y", HEADER_HEIGHT * 3.5)
+        .text((d) => d.hash)
+        .transition()
+          .duration(500)
+          .attr("fill", "rgba(0, 0, 0, 1)")
+  };
+
+<!-- END -->
+
+    </script>
+  </body>
+</html>

@@ -1,0 +1,4 @@
+*sublime*
+*.log
+dist/bundle.js.map
+node_modules/
